@@ -63,3 +63,28 @@ online). README.
 **Evidence:** localhost in the browser pane: 1 tapped 5x -> 3 (stays);
 long press -> 2, the click after it ignored; W tapped 3x -> 1 with the
 toast; second half: 5 tapped 4x -> 2 (red), E -> 1.
+
+## 2026-11-16 — Fix: installed phones stuck on the old version
+
+**Report (Jeremy):** added to the home screen, online for 5-10 min, still
+the old behavior (v1) after v2 was pushed.
+
+**Cause:** sw.js v1/v2 cached with cache.addAll(), which may take the files
+from the browser HTTP cache (GitHub Pages max-age=600) -> v2 stored the old
+index.html; and the fetch handler was cache-first -> never looked again.
+
+**Changed:** sw.js v3: install fetches every file with cache: "reload";
+fetch is network-first (cache: "no-store", 3 s timeout, fresh copies put
+in the cache) and falls back to the cache offline / without internet
+(navigations to index.html). index.html: register with updateViaCache
+"none", call reg.update() on every open, reload once on controllerchange
+(not during a recording); version label "v3" next to the title; the
+service worker also runs on localhost (testing). README: how to update,
+and the export-then-reinstall fallback.
+
+**Evidence:** localhost:8092 in the pane: v3 installed (cache holds the
+v3 page); a fake newer version on the server (v3-TEST / cache 3t) showed
+on the first reload and replaced the cache; server stopped -> reload still
+renders from the cache (12 boxes). Phones on v2 pick up v3 once its sw.js
+is fetched (the browser checks sw.js itself without the HTTP cache), then
+one more open.

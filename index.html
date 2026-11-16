@@ -150,7 +150,7 @@
 <body>
 <div class="app">
   <header>
-    <h1>TEL 計分面板</h1>
+    <h1>TEL 計分面板 <small id="appVersion" style="font-size:12px;color:var(--muted);font-weight:400">v3</small></h1>
     <div class="tabs">
       <button id="tabScore" class="on">計分</button>
       <button id="tabLog">紀錄</button>
@@ -778,8 +778,19 @@ renderTop();
 renderBoard();
 // Offline install (GitHub Pages / any https): cache this page. Opened as a
 // file there is no service worker, and none is needed.
-if ("serviceWorker" in navigator && location.protocol === "https:") {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+  // Look for a new version every time the app opens (iOS home-screen apps
+  // don't always check by themselves), and reload once when it takes over,
+  // so an online open ends up on the newest version (2026-11-16).
+  navigator.serviceWorker.register("sw.js", { updateViaCache: "none" })
+    .then((reg) => reg.update())
+    .catch(() => {});
+  let reloaded = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (reloaded || recorder) return; // never cut a recording short
+    reloaded = true;
+    location.reload();
+  });
 }
 // Ask the browser not to evict the data.
 if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
