@@ -360,7 +360,10 @@ function fileStamp() {
   return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
 }
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-const maxBalls = (half) => (half === 2 ? 2 : 3);
+// Per box: the bonus boxes Q W E take one ball (2026-11-16); the grid 3 in
+// the first half, 2 in the second.
+const BONUS = new Set(["Q", "W", "E"]);
+const maxBalls = (half, hole) => (BONUS.has(hole) ? 1 : half === 2 ? 2 : 3);
 const holeLabel = (h) => (h ? `${h}（${HOLES[h]}）` : "未指定框");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 let toastTimer;
@@ -384,7 +387,7 @@ function renderTop() {
   const half = state.current.half;
   $("legend").innerHTML = HALF_COLORS[half].map((c, n) =>
     `<span><i class="dot" style="background:${c}"></i>${COLOR_WORDS[c]} ${n} 顆</span>`).join("") +
-    `<span style="margin-left:auto">長按 −1</span>`;
+    `<span>加分框最多 1 顆</span><span style="margin-left:auto">長按 −1</span>`;
 }
 
 function renderBoard() {
@@ -409,12 +412,14 @@ function isCurrentNote(n) {
 }
 
 function changeCount(hole, delta) {
-  const max = maxBalls(state.current.half);
+  const max = maxBalls(state.current.half, hole);
   const before = state.current.counts[hole] || 0;
-  let after = before + delta;
-  if (after > max) after = 0;          // tap past the max wraps to 0
-  if (after < 0) after = 0;
-  if (after === before) return;
+  // Full stays full (2026-11-16): only a long press takes one off.
+  const after = Math.max(0, Math.min(max, before + delta));
+  if (after === before) {
+    if (delta > 0) toast(BONUS.has(hole) ? `${hole} 加分框只能進 1 顆` : `${hole} 已經滿了（長按 −1）`);
+    return;
+  }
   undoStack.push({ hole, before });
   state.current.counts[hole] = after;
   save();

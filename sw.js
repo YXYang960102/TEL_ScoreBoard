@@ -1,7 +1,7 @@
 // Offline cache for the installed (home-screen) app. Bump VERSION with every
 // change to index.html so the phones pick it up the next time they are
 // online; until then they keep using the cached copy.
-const VERSION = "tel-scoreboard-1";
+const VERSION = "tel-scoreboard-2";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 
 self.addEventListener("install", (e) => {

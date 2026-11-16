@@ -47,3 +47,19 @@ Checked there: page renders, the service worker is active, cache
 tel-scoreboard-1 holds index.html, manifest and both icons, secure context
 (mic available). README carries the URL. Not yet tried: installing it on
 a real iPhone / Android and using it with the network off.
+
+## 2026-11-16 — Full boxes stay full; bonus boxes take one ball
+
+**User Request (Jeremy):** tapping a full box wrapped to 0 -- it should
+stay full, only a long press takes one off; the bonus boxes can only be
+scored once.
+
+**Changed:** `maxBalls(half, hole)`: Q W E -> 1 (both halves), grid 3 / 2.
+`changeCount` clamps to 0..max (no wrap); a tap on a full box shows a
+toast ("已經滿了（長按 −1）" / "加分框只能進 1 顆"). Legend adds 加分框最多 1
+顆. sw.js VERSION tel-scoreboard-2 (installed phones update next time
+online). README.
+
+**Evidence:** localhost in the browser pane: 1 tapped 5x -> 3 (stays);
+long press -> 2, the click after it ignored; W tapped 3x -> 1 with the
+toast; second half: 5 tapped 4x -> 2 (red), E -> 1.
