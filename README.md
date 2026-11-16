@@ -1,6 +1,8 @@
 # TEL 計分面板（輔助人員用）
 
 在平板或手機上記每一場的進球數、沒進的框，並可以錄音。**完全離線**，賽場上不用網路。
+
+**安裝網址（賽前有網路時打開一次，加入主畫面）：https://yxyang960102.github.io/TEL_ScoreBoard/**
 所有程式都在 `index.html` 一個檔案裡，沒有用到任何網路上的資源。
 
 ## 怎麼給隊友
@@ -20,7 +22,7 @@
 賽前**有網路時**做一次，之後在賽場上完全離線使用，錄音也可以用。
 
 1. 把這個資料夾放到 GitHub，開啟 GitHub Pages：Settings → Pages → Branch 選 `main`、資料夾選 `/ (root)`，存檔。
-   網址會是 `https://<帳號>.github.io/<repo 名稱>/`。
+   已經開好了：https://yxyang960102.github.io/TEL_ScoreBoard/ （repo：YXYang960102/TEL_ScoreBoard，public）。
 2. 隊友在有網路時用手機打開這個網址：
    - iPhone / iPad：用 **Safari** 打開 → 分享按鈕 → 「加入主畫面」。
    - Android：用 **Chrome** 打開 → 右上角選單 → 「安裝應用程式」或「加到主畫面」。

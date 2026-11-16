@@ -37,3 +37,13 @@ wraps after 2), reload keeps data; CSV / JSON export content, JSON import
 round trip; recording with a synthetic mic stream -> 46 KB webm clip in
 IndexedDB, audio player in the log. Not tried: a real phone, iOS, a real
 microphone, offline install from GitHub Pages (no repo / Pages yet).
+
+## 2026-11-16 — Published: GitHub repo + Pages
+
+Public repo YXYang960102/TEL_ScoreBoard (created in the browser, Jeremy
+signed in himself; `gh` is not installed on this Mac), pushed 52ef577,
+Pages from main / root: https://yxyang960102.github.io/TEL_ScoreBoard/ .
+Checked there: page renders, the service worker is active, cache
+tel-scoreboard-1 holds index.html, manifest and both icons, secure context
+(mic available). README carries the URL. Not yet tried: installing it on
+a real iPhone / Android and using it with the network off.
