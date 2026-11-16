@@ -1,0 +1,783 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="theme-color" content="#14181f">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="TEL 計分">
+<title>TEL 計分面板</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root {
+    --bg: #14181f;
+    --panel: #1d232d;
+    --panel-2: #262e3a;
+    --line: #36404f;
+    --text: #eef1f6;
+    --muted: #9aa5b5;
+    --accent: #4f9dff;
+    --danger: #ef5350;
+    --c0: #f4f5f7;   /* 0 balls: white */
+    --c1: #34c759;   /* 1: green */
+    --c2y: #ffcc00;  /* 2 in the first half: yellow */
+    --c3: #ff3b30;   /* 3 (first half) / 2 (second half): red */
+    --radius: 14px;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "PingFang TC", "Noto Sans TC", "Microsoft JhengHei", sans-serif;
+    font-size: 16px; overscroll-behavior: none;
+    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+    user-select: none; -webkit-user-select: none;
+  }
+  input, select, textarea, button { font: inherit; color: inherit; }
+  button { cursor: pointer; }
+  .app { max-width: 760px; margin: 0 auto; padding: 10px 12px 120px; }
+
+  header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+  header h1 { font-size: 18px; margin: 0; flex: 1; letter-spacing: .5px; }
+  .tabs { display: flex; background: var(--panel); border-radius: 10px; padding: 3px; }
+  .tabs button { border: 0; background: transparent; padding: 7px 14px; border-radius: 8px; color: var(--muted); }
+  .tabs button.on { background: var(--panel-2); color: var(--text); }
+
+  .bar { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .field { background: var(--panel); border-radius: 10px; padding: 6px 10px; }
+  .field label { display: block; font-size: 12px; color: var(--muted); }
+  .field input, .field select { width: 100%; background: transparent; border: 0; outline: 0; font-size: 17px; padding: 2px 0; }
+  .field select option { color: #000; }
+  .seg { display: flex; gap: 4px; margin-top: 2px; }
+  .seg button { flex: 1; border: 1px solid var(--line); background: transparent; border-radius: 7px; padding: 4px 0; font-size: 15px; color: var(--muted); }
+  .seg button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  .legend { display: flex; gap: 10px; flex-wrap: wrap; font-size: 13px; color: var(--muted); margin: 4px 2px 8px; }
+  .legend span { display: inline-flex; align-items: center; gap: 4px; }
+  .dot { width: 14px; height: 14px; border-radius: 4px; display: inline-block; border: 1px solid #0004; }
+
+  .mode { display: flex; gap: 8px; margin-bottom: 8px; }
+  .mode button { flex: 1; border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 9px 0; color: var(--muted); }
+  .mode button.on { border-color: var(--accent); color: var(--text); background: var(--panel-2); }
+  .mode button.miss.on { border-color: var(--danger); }
+
+  .board { background: var(--panel); border-radius: var(--radius); padding: 10px; }
+  .row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px; }
+  .row:last-child { margin-bottom: 0; }
+  .row.bonus { gap: 18px; padding: 0 18px; }
+  .cell {
+    position: relative; border: 0; border-radius: 12px; aspect-ratio: 1.15 / 1;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    color: #111; transition: transform .06s; touch-action: manipulation; box-shadow: inset 0 0 0 2px #0002;
+  }
+  .row.bonus .cell { aspect-ratio: 1.6 / 1; }
+  .cell:active { transform: scale(.96); }
+  .cell .name { font-size: 15px; font-weight: 600; opacity: .8; }
+  .cell .count { font-size: 40px; font-weight: 800; line-height: 1.05; }
+  .row.bonus .cell .count { font-size: 30px; }
+  .cell .misses { position: absolute; top: 6px; right: 8px; font-size: 13px; font-weight: 700; color: #b00020; }
+  .board.missing .cell { box-shadow: inset 0 0 0 3px var(--danger); }
+
+  .summary { display: flex; justify-content: space-between; align-items: center; margin: 10px 2px; color: var(--muted); font-size: 15px; }
+  .summary b { color: var(--text); font-size: 20px; }
+
+  .actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .btn { border: 1px solid var(--line); background: var(--panel); border-radius: 10px; padding: 11px 6px; font-size: 15px; }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .btn.danger { color: var(--danger); }
+
+  .rec {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(18px + env(safe-area-inset-bottom)); z-index: 5;
+    border: 0; border-radius: 40px; padding: 15px 26px; font-size: 18px; font-weight: 700;
+    background: #2b3443; color: var(--text); box-shadow: 0 6px 20px #0008; display: flex; align-items: center; gap: 10px;
+  }
+  .rec .led { width: 14px; height: 14px; border-radius: 50%; background: var(--danger); }
+  .rec.on { background: var(--danger); color: #fff; }
+  .rec.on .led { background: #fff; animation: blink 1s infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  .sheet-bg { position: fixed; inset: 0; background: #0009; z-index: 10; display: none; }
+  .sheet {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; display: none;
+    background: var(--panel); border-radius: 18px 18px 0 0; padding: 14px 16px calc(18px + env(safe-area-inset-bottom));
+    max-height: 88vh; overflow: auto; max-width: 760px; margin: 0 auto;
+  }
+  .sheet.open, .sheet-bg.open { display: block; }
+  .sheet h2 { font-size: 18px; margin: 0 0 10px; }
+  .sheet .lbl { font-size: 13px; color: var(--muted); margin: 10px 0 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chip { border: 1px solid var(--line); background: transparent; border-radius: 20px; padding: 7px 13px; font-size: 15px; }
+  .chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .sheet textarea, .sheet input[type=number] {
+    width: 100%; background: var(--panel-2); border: 1px solid var(--line); border-radius: 10px; padding: 9px 10px; outline: 0;
+  }
+  .sheet textarea { min-height: 60px; resize: vertical; user-select: text; -webkit-user-select: text; }
+  .sheet .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 14px; }
+
+  .list { display: flex; flex-direction: column; gap: 10px; }
+  .card { background: var(--panel); border-radius: var(--radius); padding: 12px; }
+  .card .top { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+  .card .top b { font-size: 16px; }
+  .card .meta { color: var(--muted); font-size: 13px; }
+  .mini { display: grid; grid-template-columns: repeat(3, 26px); gap: 3px; margin-top: 8px; }
+  .mini div { height: 20px; border-radius: 4px; font-size: 12px; font-weight: 700; color: #111; display: flex; align-items: center; justify-content: center; }
+  .mini .b { height: 14px; font-size: 10px; }
+  .card audio { width: 100%; margin-top: 8px; height: 36px; }
+  .card .del { border: 0; background: transparent; color: var(--muted); font-size: 14px; }
+  .section-title { font-size: 14px; color: var(--muted); margin: 18px 2px 8px; display: flex; justify-content: space-between; }
+  .empty { color: var(--muted); font-size: 14px; padding: 10px 2px; }
+  .tools { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+  .toast {
+    position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); transform: translateX(-50%);
+    background: #000d; color: #fff; padding: 9px 16px; border-radius: 20px; font-size: 14px; z-index: 20;
+    opacity: 0; transition: opacity .2s; pointer-events: none; max-width: 90vw; text-align: center;
+  }
+  .toast.show { opacity: 1; }
+  .hidden { display: none !important; }
+  .warn { background: #3a2a12; color: #ffcf7a; border-radius: 10px; padding: 8px 10px; font-size: 13px; margin-bottom: 10px; }
+  @media (max-width: 380px) {
+    .cell .count { font-size: 32px; }
+    .bar { grid-template-columns: 1fr 1fr; }
+    .bar .field:first-child { grid-column: span 2; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <h1>TEL 計分面板</h1>
+    <div class="tabs">
+      <button id="tabScore" class="on">計分</button>
+      <button id="tabLog">紀錄</button>
+    </div>
+  </header>
+
+  <div id="storageWarn" class="warn hidden">這個瀏覽器不能存資料（無痕模式或被封鎖）：重新整理就會不見，記完請馬上匯出。</div>
+
+  <!-- ===================== Score view ===================== -->
+  <section id="viewScore">
+    <div class="bar">
+      <div class="field">
+        <label>場次</label>
+        <input id="matchInput" inputmode="text" placeholder="例如 Q12">
+      </div>
+      <div class="field">
+        <label>半場</label>
+        <div class="seg" id="halfSeg">
+          <button data-half="1" class="on">上半場</button>
+          <button data-half="2">下半場</button>
+        </div>
+      </div>
+      <div class="field">
+        <label>球色</label>
+        <select id="colorSelect"></select>
+      </div>
+    </div>
+
+    <div class="legend" id="legend"></div>
+
+    <div class="mode">
+      <button id="modeCount" class="on">計分（點一下 +1）</button>
+      <button id="modeMiss" class="miss">標記沒進</button>
+    </div>
+
+    <div class="board" id="board"></div>
+
+    <div class="summary">
+      <span>這半場進球 <b id="totalBalls">0</b></span>
+      <span>沒進紀錄 <b id="totalMisses">0</b></span>
+    </div>
+
+    <div class="actions">
+      <button class="btn" id="undoBtn">復原</button>
+      <button class="btn danger" id="resetBtn">清空</button>
+      <button class="btn primary" id="saveBtn">儲存這半場</button>
+    </div>
+  </section>
+
+  <!-- ===================== Log view ===================== -->
+  <section id="viewLog" class="hidden">
+    <div class="tools">
+      <button class="btn primary" id="exportJson">匯出全部（含錄音）</button>
+      <button class="btn" id="exportCsv">匯出表格 CSV</button>
+      <button class="btn" id="importBtn">匯入紀錄</button>
+      <button class="btn danger" id="clearAll">刪除全部紀錄</button>
+    </div>
+    <input type="file" id="importFile" accept=".json,application/json" class="hidden">
+    <div class="section-title"><span>沒進 / 語音紀錄</span><span id="missCount"></span></div>
+    <div class="list" id="missList"></div>
+    <div class="section-title"><span>已儲存的半場</span><span id="halfCount"></span></div>
+    <div class="list" id="halfList"></div>
+  </section>
+</div>
+
+<button class="rec" id="recBtn"><span class="led"></span><span id="recLabel">錄音</span></button>
+
+<div class="sheet-bg" id="sheetBg"></div>
+<div class="sheet" id="missSheet">
+  <h2 id="sheetTitle">沒進</h2>
+  <div class="lbl">框</div>
+  <div class="chips" id="sheetHoles"></div>
+  <div class="lbl">球色</div>
+  <div class="chips" id="sheetColors"></div>
+  <div class="lbl">距離（公尺）</div>
+  <div class="chips" id="sheetDist"></div>
+  <div class="lbl">備註</div>
+  <textarea id="sheetNote" placeholder="例如：偏高、打到框邊"></textarea>
+  <div class="row2">
+    <button class="btn" id="sheetRec">🎙 錄一段語音</button>
+    <span id="sheetRecState" class="meta" style="align-self:center;color:var(--muted);font-size:13px"></span>
+  </div>
+  <div class="row2">
+    <button class="btn" id="sheetCancel">取消</button>
+    <button class="btn primary" id="sheetSave">儲存</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+/* TEL 計分面板 (2026-11-15). One file, no network: open it as a file, or
+   from GitHub Pages once and add it to the home screen (works offline after).
+   Data: localStorage (scores, notes) + IndexedDB (voice clips). Export /
+   import as JSON (with the clips) or CSV. */
+
+// ---------- constants ----------
+const STORE_KEY = "tel-scoreboard-v1";
+const COLORS = ["黃", "紫", "藍", "綠", "紅", "橘"];
+// Dashboard numbering: columns left -> right are 1 2 3 / 4 5 6 / 7 8 9,
+// each bottom -> top; Q W E the bonus boxes above.
+const HOLES = {
+  Q: "加分左", W: "加分中", E: "加分右",
+  1: "左下", 2: "左中", 3: "左上", 4: "中下", 5: "中", 6: "中上", 7: "右下", 8: "右中", 9: "右上",
+};
+const LAYOUT = [["Q", "W", "E"], ["3", "6", "9"], ["2", "5", "8"], ["1", "4", "7"]];
+const HOLE_ORDER = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "Q", "W", "E"];
+// Ball count -> color, per half: first 0-3, second 0-2.
+const HALF_COLORS = {
+  1: ["var(--c0)", "var(--c1)", "var(--c2y)", "var(--c3)"],
+  2: ["var(--c0)", "var(--c1)", "var(--c3)"],
+};
+const HALF_NAMES = { 1: "上半場", 2: "下半場" };
+const COLOR_WORDS = { "var(--c0)": "白", "var(--c1)": "綠", "var(--c2y)": "黃", "var(--c3)": "紅" };
+const DISTANCES = ["2.5", "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5"];
+
+// ---------- state ----------
+const blankCounts = () => Object.fromEntries(HOLE_ORDER.map((h) => [h, 0]));
+let state = {
+  current: { match: "", half: 1, ballColor: "黃", counts: blankCounts(), startedAt: Date.now() },
+  halves: [],   // saved halves
+  notes: [],    // misses / voice notes
+};
+let undoStack = [];
+let mode = "count";
+let storageOk = true;
+
+function load() {
+  try {
+    const raw = localStorage.getItem(STORE_KEY);
+    if (raw) {
+      const s = JSON.parse(raw);
+      if (s && s.current && Array.isArray(s.halves) && Array.isArray(s.notes)) {
+        state = s;
+        state.current.counts = Object.assign(blankCounts(), state.current.counts || {});
+      }
+    }
+    localStorage.setItem(STORE_KEY + "-probe", "1");
+    localStorage.removeItem(STORE_KEY + "-probe");
+  } catch (e) {
+    storageOk = false;
+  }
+  document.getElementById("storageWarn").classList.toggle("hidden", storageOk);
+}
+function save() {
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); }
+  catch (e) {
+    if (storageOk) toast("無法存檔（空間不足或被封鎖），請先匯出");
+    storageOk = false;
+    document.getElementById("storageWarn").classList.remove("hidden");
+  }
+}
+
+// ---------- IndexedDB for voice clips ----------
+let dbPromise = null;
+function db() {
+  if (!dbPromise) {
+    dbPromise = new Promise((resolve) => {
+      try {
+        const req = indexedDB.open("tel-scoreboard-audio", 1);
+        req.onupgradeneeded = () => req.result.createObjectStore("clips");
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => resolve(null);
+      } catch (e) { resolve(null); }
+    });
+  }
+  return dbPromise;
+}
+const memClips = new Map(); // fallback when IndexedDB is unavailable
+async function putClip(id, blob) {
+  memClips.set(id, blob);
+  const d = await db();
+  if (!d) return;
+  await new Promise((res) => {
+    const tx = d.transaction("clips", "readwrite");
+    tx.objectStore("clips").put(blob, id);
+    tx.oncomplete = res; tx.onerror = res; tx.onabort = res;
+  });
+}
+async function getClip(id) {
+  if (memClips.has(id)) return memClips.get(id);
+  const d = await db();
+  if (!d) return null;
+  return new Promise((res) => {
+    const req = d.transaction("clips").objectStore("clips").get(id);
+    req.onsuccess = () => { if (req.result) memClips.set(id, req.result); res(req.result || null); };
+    req.onerror = () => res(null);
+  });
+}
+async function deleteClip(id) {
+  memClips.delete(id);
+  const d = await db();
+  if (!d) return;
+  d.transaction("clips", "readwrite").objectStore("clips").delete(id);
+}
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const pad = (n) => String(n).padStart(2, "0");
+function stamp(t) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+function fileStamp() {
+  const d = new Date();
+  return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}`;
+}
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const maxBalls = (half) => (half === 2 ? 2 : 3);
+const holeLabel = (h) => (h ? `${h}（${HOLES[h]}）` : "未指定框");
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+let toastTimer;
+function toast(text) {
+  const t = $("toast");
+  t.textContent = text;
+  t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove("show"), 1800);
+}
+function buzz() { try { navigator.vibrate && navigator.vibrate(15); } catch (e) {} }
+
+// ---------- score view ----------
+function renderTop() {
+  $("matchInput").value = state.current.match;
+  document.querySelectorAll("#halfSeg button").forEach((b) =>
+    b.classList.toggle("on", Number(b.dataset.half) === state.current.half));
+  const sel = $("colorSelect");
+  if (!sel.options.length) COLORS.forEach((c) => sel.add(new Option(c + "球", c)));
+  sel.value = state.current.ballColor;
+  const half = state.current.half;
+  $("legend").innerHTML = HALF_COLORS[half].map((c, n) =>
+    `<span><i class="dot" style="background:${c}"></i>${COLOR_WORDS[c]} ${n} 顆</span>`).join("") +
+    `<span style="margin-left:auto">長按 −1</span>`;
+}
+
+function renderBoard() {
+  const half = state.current.half;
+  const colors = HALF_COLORS[half];
+  const missCount = {};
+  state.notes.filter(isCurrentNote).forEach((n) => { if (n.hole) missCount[n.hole] = (missCount[n.hole] || 0) + 1; });
+  $("board").innerHTML = LAYOUT.map((row, i) =>
+    `<div class="row${i === 0 ? " bonus" : ""}">` + row.map((h) => {
+      const n = state.current.counts[h] || 0;
+      const m = missCount[h] ? `<span class="misses">✕${missCount[h]}</span>` : "";
+      return `<button class="cell" data-hole="${h}" style="background:${colors[Math.min(n, colors.length - 1)]}">` +
+        `${m}<span class="name">${h}</span><span class="count">${n}</span></button>`;
+    }).join("") + `</div>`).join("");
+  $("board").classList.toggle("missing", mode === "miss");
+  const total = HOLE_ORDER.reduce((s, h) => s + (state.current.counts[h] || 0), 0);
+  $("totalBalls").textContent = total;
+  $("totalMisses").textContent = state.notes.filter(isCurrentNote).length;
+}
+function isCurrentNote(n) {
+  return n.half === state.current.half && n.match === state.current.match && n.at >= state.current.startedAt;
+}
+
+function changeCount(hole, delta) {
+  const max = maxBalls(state.current.half);
+  const before = state.current.counts[hole] || 0;
+  let after = before + delta;
+  if (after > max) after = 0;          // tap past the max wraps to 0
+  if (after < 0) after = 0;
+  if (after === before) return;
+  undoStack.push({ hole, before });
+  state.current.counts[hole] = after;
+  save();
+  renderBoard();
+  buzz();
+}
+
+// Tap = +1, long press = -1 (count mode); tap = a miss note (miss mode).
+let pressTimer = null, longPressed = false;
+$("board").addEventListener("pointerdown", (e) => {
+  const cell = e.target.closest(".cell");
+  if (!cell) return;
+  longPressed = false;
+  clearTimeout(pressTimer);
+  if (mode === "count") {
+    pressTimer = setTimeout(() => { longPressed = true; changeCount(cell.dataset.hole, -1); }, 480);
+  }
+});
+["pointerup", "pointerleave", "pointercancel"].forEach((ev) =>
+  $("board").addEventListener(ev, () => clearTimeout(pressTimer)));
+$("board").addEventListener("click", (e) => {
+  const cell = e.target.closest(".cell");
+  if (!cell) return;
+  if (longPressed) { longPressed = false; return; }
+  if (mode === "miss") openSheet(cell.dataset.hole);
+  else changeCount(cell.dataset.hole, +1);
+});
+$("board").addEventListener("contextmenu", (e) => e.preventDefault());
+
+$("matchInput").addEventListener("change", () => {
+  state.current.match = $("matchInput").value.trim();
+  save(); renderBoard();
+});
+document.querySelectorAll("#halfSeg button").forEach((b) => b.addEventListener("click", () => {
+  const half = Number(b.dataset.half);
+  if (half === state.current.half) return;
+  const total = HOLE_ORDER.reduce((s, h) => s + (state.current.counts[h] || 0), 0);
+  if (total > 0 && !confirm(`這半場還沒儲存（${total} 顆）。要先儲存嗎？\n按「確定」儲存後切換，按「取消」不切換。`)) return;
+  if (total > 0) saveHalf(true);
+  state.current.half = half;
+  state.current.counts = blankCounts();
+  state.current.startedAt = Date.now();
+  undoStack = [];
+  save(); renderTop(); renderBoard();
+}));
+$("colorSelect").addEventListener("change", () => { state.current.ballColor = $("colorSelect").value; save(); });
+
+function setMode(m) {
+  mode = m;
+  $("modeCount").classList.toggle("on", m === "count");
+  $("modeMiss").classList.toggle("on", m === "miss");
+  renderBoard();
+}
+$("modeCount").addEventListener("click", () => setMode("count"));
+$("modeMiss").addEventListener("click", () => setMode("miss"));
+
+$("undoBtn").addEventListener("click", () => {
+  const last = undoStack.pop();
+  if (!last) { toast("沒有可以復原的"); return; }
+  state.current.counts[last.hole] = last.before;
+  save(); renderBoard();
+});
+$("resetBtn").addEventListener("click", () => {
+  if (!confirm("清空這半場的計分？（沒進紀錄不會刪）")) return;
+  state.current.counts = blankCounts();
+  undoStack = [];
+  save(); renderBoard();
+});
+function saveHalf(quiet) {
+  const counts = { ...state.current.counts };
+  const total = HOLE_ORDER.reduce((s, h) => s + (counts[h] || 0), 0);
+  state.halves.unshift({
+    id: uid(), match: state.current.match, half: state.current.half, ballColor: state.current.ballColor,
+    counts, total, startedAt: state.current.startedAt, savedAt: Date.now(),
+  });
+  state.current.counts = blankCounts();
+  state.current.startedAt = Date.now();
+  undoStack = [];
+  save();
+  if (!quiet) toast(`已儲存：${state.current.match || "未填場次"} ${HALF_NAMES[state.current.half]}，${total} 顆`);
+}
+$("saveBtn").addEventListener("click", () => {
+  if (!state.current.match && !confirm("還沒填場次，仍要儲存嗎？")) return;
+  saveHalf(false);
+  renderBoard(); renderLog();
+});
+
+// ---------- voice recording ----------
+let recorder = null, recChunks = [], recTarget = null, recStartedAt = 0, recStream = null;
+function pickMime() {
+  if (!window.MediaRecorder) return null;
+  const types = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/aac", "audio/ogg"];
+  return types.find((t) => MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(t)) || "";
+}
+async function startRec(target) {
+  if (recorder) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) {
+    toast("這裡不能錄音：iPhone 請用安裝到主畫面的版本，或改寫備註");
+    return;
+  }
+  try {
+    recStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (e) {
+    toast("拿不到麥克風（沒有允許，或用檔案開啟時不支援）");
+    return;
+  }
+  const mime = pickMime();
+  try {
+    recorder = mime ? new MediaRecorder(recStream, { mimeType: mime }) : new MediaRecorder(recStream);
+  } catch (e) {
+    recorder = new MediaRecorder(recStream);
+  }
+  recChunks = [];
+  recTarget = target;
+  recStartedAt = Date.now();
+  recorder.ondataavailable = (e) => { if (e.data && e.data.size) recChunks.push(e.data); };
+  recorder.onstop = finishRec;
+  recorder.start();
+  setRecUi(true);
+  buzz();
+}
+function stopRec() {
+  if (recorder && recorder.state !== "inactive") recorder.stop();
+}
+async function finishRec() {
+  const blob = new Blob(recChunks, { type: recorder.mimeType || "audio/webm" });
+  const seconds = Math.round((Date.now() - recStartedAt) / 100) / 10;
+  recStream.getTracks().forEach((t) => t.stop());
+  recorder = null; recStream = null;
+  setRecUi(false);
+  if (!blob.size) { toast("沒有錄到聲音"); return; }
+  const clipId = "clip-" + uid();
+  await putClip(clipId, blob);
+  if (recTarget === "sheet") {
+    sheetDraft.clipId = clipId;
+    sheetDraft.clipSeconds = seconds;
+    $("sheetRecState").textContent = `已錄 ${seconds} 秒`;
+  } else {
+    // The big button: a voice note of its own (the operator says hole,
+    // distance, color); tag it later in the log if wanted.
+    addNote({ hole: null, ballColor: state.current.ballColor, distance: "", note: "", clipId, clipSeconds: seconds });
+    toast(`語音已存（${seconds} 秒）`);
+  }
+}
+function setRecUi(on) {
+  $("recBtn").classList.toggle("on", on && recTarget === "main");
+  $("recLabel").textContent = on && recTarget === "main" ? "停止錄音" : "錄音";
+  $("sheetRec").textContent = on && recTarget === "sheet" ? "■ 停止錄音" : "🎙 錄一段語音";
+  if (on && recTarget === "sheet") $("sheetRecState").textContent = "錄音中…";
+}
+$("recBtn").addEventListener("click", () => (recorder ? stopRec() : startRec("main")));
+
+// ---------- miss sheet ----------
+let sheetDraft = null;
+function chips(el, values, current, label) {
+  el.innerHTML = values.map((v) =>
+    `<button class="chip${v === current ? " on" : ""}" data-v="${esc(v)}">${esc(label ? label(v) : v)}</button>`).join("");
+}
+function openSheet(hole) {
+  sheetDraft = { hole, ballColor: state.current.ballColor, distance: "", note: "", clipId: null, clipSeconds: 0 };
+  $("sheetTitle").textContent = `沒進：${holeLabel(hole)}`;
+  chips($("sheetHoles"), HOLE_ORDER, hole, (h) => h);
+  chips($("sheetColors"), COLORS, sheetDraft.ballColor, (c) => c + "球");
+  chips($("sheetDist"), DISTANCES, "", (d) => d + " m");
+  $("sheetNote").value = "";
+  $("sheetRecState").textContent = "";
+  $("missSheet").classList.add("open");
+  $("sheetBg").classList.add("open");
+}
+function closeSheet() {
+  if (recorder && recTarget === "sheet") stopRec();
+  $("missSheet").classList.remove("open");
+  $("sheetBg").classList.remove("open");
+}
+function bindChips(el, key, titleUpdate) {
+  el.addEventListener("click", (e) => {
+    const b = e.target.closest(".chip");
+    if (!b) return;
+    const v = b.dataset.v;
+    sheetDraft[key] = sheetDraft[key] === v && key === "distance" ? "" : v;
+    el.querySelectorAll(".chip").forEach((c) => c.classList.toggle("on", c.dataset.v === sheetDraft[key]));
+    if (titleUpdate) $("sheetTitle").textContent = `沒進：${holeLabel(sheetDraft.hole)}`;
+  });
+}
+bindChips($("sheetHoles"), "hole", true);
+bindChips($("sheetColors"), "ballColor");
+bindChips($("sheetDist"), "distance");
+$("sheetRec").addEventListener("click", () => {
+  if (recorder) { if (recTarget === "sheet") stopRec(); return; }
+  startRec("sheet");
+});
+$("sheetCancel").addEventListener("click", () => {
+  if (sheetDraft && sheetDraft.clipId) deleteClip(sheetDraft.clipId);
+  closeSheet();
+});
+$("sheetBg").addEventListener("click", closeSheet);
+$("sheetSave").addEventListener("click", () => {
+  sheetDraft.note = $("sheetNote").value.trim();
+  addNote(sheetDraft);
+  toast(`已記沒進：${holeLabel(sheetDraft.hole)}`);
+  closeSheet();
+});
+
+function addNote(d) {
+  state.notes.unshift({
+    id: uid(), at: Date.now(), match: state.current.match, half: state.current.half,
+    hole: d.hole, ballColor: d.ballColor, distance: d.distance, note: d.note,
+    clipId: d.clipId || null, clipSeconds: d.clipSeconds || 0,
+  });
+  save(); renderBoard(); renderLog();
+}
+
+// ---------- log view ----------
+function miniGrid(counts, half) {
+  const colors = HALF_COLORS[half];
+  return `<div class="mini">` + LAYOUT.map((row, i) => row.map((h) => {
+    const n = counts[h] || 0;
+    return `<div class="${i === 0 ? "b" : ""}" style="background:${colors[Math.min(n, colors.length - 1)]}">${n}</div>`;
+  }).join("")).join("") + `</div>`;
+}
+function renderLog() {
+  const halves = state.halves;
+  $("halfCount").textContent = `${halves.length} 筆`;
+  $("halfList").innerHTML = halves.length ? halves.map((r) => `
+    <div class="card" data-id="${r.id}">
+      <div class="top"><b>${esc(r.match || "未填場次")}　${HALF_NAMES[r.half]}　${esc(r.ballColor)}球</b>
+        <button class="del" data-del-half="${r.id}">刪除</button></div>
+      <div class="meta">${stamp(r.savedAt)}　進球 ${r.total} 顆</div>
+      ${miniGrid(r.counts, r.half)}
+    </div>`).join("") : `<div class="empty">還沒有儲存的半場。</div>`;
+
+  const notes = state.notes;
+  $("missCount").textContent = `${notes.length} 筆`;
+  $("missList").innerHTML = notes.length ? notes.map((n) => `
+    <div class="card" data-id="${n.id}">
+      <div class="top"><b>${esc(holeLabel(n.hole))}　${esc(n.ballColor || "")}球${n.distance ? `　${esc(n.distance)} m` : ""}</b>
+        <button class="del" data-del-note="${n.id}">刪除</button></div>
+      <div class="meta">${stamp(n.at)}　${esc(n.match || "未填場次")} ${HALF_NAMES[n.half] || ""}${n.clipId ? `　🎙 ${n.clipSeconds} 秒` : ""}</div>
+      ${n.note ? `<div style="margin-top:6px">${esc(n.note)}</div>` : ""}
+      ${n.clipId ? `<audio controls preload="none" data-clip="${n.clipId}"></audio>` : ""}
+    </div>`).join("") : `<div class="empty">還沒有沒進或語音紀錄。按下方「錄音」直接說：框、距離、球色。</div>`;
+  // Load the clips into the players.
+  document.querySelectorAll("audio[data-clip]").forEach(async (a) => {
+    const blob = await getClip(a.dataset.clip);
+    if (blob) a.src = URL.createObjectURL(blob);
+    else a.replaceWith(Object.assign(document.createElement("div"), { className: "meta", textContent: "（這台裝置上沒有這段錄音）" }));
+  });
+}
+$("halfList").addEventListener("click", (e) => {
+  const id = e.target.dataset.delHalf;
+  if (!id || !confirm("刪除這半場的紀錄？")) return;
+  state.halves = state.halves.filter((r) => r.id !== id);
+  save(); renderLog();
+});
+$("missList").addEventListener("click", (e) => {
+  const id = e.target.dataset.delNote;
+  if (!id || !confirm("刪除這筆紀錄（含錄音）？")) return;
+  const n = state.notes.find((x) => x.id === id);
+  if (n && n.clipId) deleteClip(n.clipId);
+  state.notes = state.notes.filter((x) => x.id !== id);
+  save(); renderLog(); renderBoard();
+});
+
+// ---------- export / import ----------
+async function deliver(blob, name) {
+  // iPhone home-screen apps can't download: hand the file to the share sheet.
+  try {
+    const file = new File([blob], name, { type: blob.type });
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && /iPhone|iPad|iPod|Macintosh/.test(navigator.userAgent) && "ontouchend" in document) {
+      await navigator.share({ files: [file], title: name });
+      return;
+    }
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+  }
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+const blobToDataUrl = (blob) => new Promise((res) => {
+  const r = new FileReader(); r.onload = () => res(r.result); r.onerror = () => res(null); r.readAsDataURL(blob);
+});
+$("exportJson").addEventListener("click", async () => {
+  const clips = {};
+  for (const n of state.notes) {
+    if (!n.clipId) continue;
+    const blob = await getClip(n.clipId);
+    if (blob) clips[n.clipId] = await blobToDataUrl(blob);
+  }
+  const data = { app: "tel-scoreboard", version: 1, exportedAt: stamp(Date.now()), halves: state.halves, notes: state.notes, clips };
+  await deliver(new Blob([JSON.stringify(data)], { type: "application/json" }), `tel_scoreboard_${fileStamp()}.json`);
+  toast(`已匯出 ${state.halves.length} 個半場、${state.notes.length} 筆紀錄`);
+});
+const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+$("exportCsv").addEventListener("click", async () => {
+  const lines = [];
+  lines.push(["類型", "時間", "場次", "半場", "球色", ...HOLE_ORDER.map((h) => `框${h}`), "進球合計", "框", "距離(m)", "備註", "錄音(秒)"].join(","));
+  for (const r of [...state.halves].reverse()) {
+    lines.push(["計分", stamp(r.savedAt), r.match, HALF_NAMES[r.half], r.ballColor, ...HOLE_ORDER.map((h) => r.counts[h] || 0), r.total, "", "", "", ""].map(csvCell).join(","));
+  }
+  for (const n of [...state.notes].reverse()) {
+    lines.push(["沒進", stamp(n.at), n.match, HALF_NAMES[n.half], n.ballColor, ...HOLE_ORDER.map(() => ""), "", n.hole || "", n.distance, n.note, n.clipId ? n.clipSeconds : ""].map(csvCell).join(","));
+  }
+  await deliver(new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv" }), `tel_scoreboard_${fileStamp()}.csv`);
+});
+$("importBtn").addEventListener("click", () => $("importFile").click());
+$("importFile").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  e.target.value = "";
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.app !== "tel-scoreboard") throw new Error("not ours");
+    const haveH = new Set(state.halves.map((r) => r.id));
+    const haveN = new Set(state.notes.map((n) => n.id));
+    let addedH = 0, addedN = 0;
+    for (const r of data.halves || []) if (!haveH.has(r.id)) { state.halves.push(r); addedH++; }
+    for (const n of data.notes || []) if (!haveN.has(n.id)) { state.notes.push(n); addedN++; }
+    for (const [id, url] of Object.entries(data.clips || {})) {
+      if (!url) continue;
+      const blob = await (await fetch(url)).blob();
+      await putClip(id, blob);
+    }
+    state.halves.sort((a, b) => b.savedAt - a.savedAt);
+    state.notes.sort((a, b) => b.at - a.at);
+    save(); renderLog(); renderBoard();
+    toast(`匯入 ${addedH} 個半場、${addedN} 筆紀錄`);
+  } catch (err) {
+    toast("這不是計分面板匯出的檔案");
+  }
+});
+$("clearAll").addEventListener("click", async () => {
+  if (!confirm("刪除這台裝置上的全部紀錄和錄音？建議先匯出。")) return;
+  if (!confirm("真的要全部刪除？刪了不能復原。")) return;
+  for (const n of state.notes) if (n.clipId) await deleteClip(n.clipId);
+  state.halves = []; state.notes = [];
+  save(); renderLog(); renderBoard();
+});
+
+// ---------- tabs ----------
+function showTab(which) {
+  $("tabScore").classList.toggle("on", which === "score");
+  $("tabLog").classList.toggle("on", which === "log");
+  $("viewScore").classList.toggle("hidden", which !== "score");
+  $("viewLog").classList.toggle("hidden", which !== "log");
+  if (which === "log") renderLog();
+}
+$("tabScore").addEventListener("click", () => showTab("score"));
+$("tabLog").addEventListener("click", () => showTab("log"));
+
+// ---------- start ----------
+load();
+renderTop();
+renderBoard();
+// Offline install (GitHub Pages / any https): cache this page. Opened as a
+// file there is no service worker, and none is needed.
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+}
+// Ask the browser not to evict the data.
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+</script>
+</body>
+</html>
