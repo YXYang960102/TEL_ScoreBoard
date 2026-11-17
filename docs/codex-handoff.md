@@ -88,3 +88,32 @@ on the first reload and replaced the cache; server stopped -> reload still
 renders from the cache (12 boxes). Phones on v2 pick up v3 once its sw.js
 is fetched (the browser checks sw.js itself without the HTTP cache), then
 one more open.
+
+## 2026-11-17 — Total score and lines, from the official rules
+
+**User Request (Jeremy):** add the total score and whether there is a line
+(連線), with the scoring from the official rules.
+
+**Source:** teltwrobotcombat.rs-event.com.tw download/2026_rule_1112.pdf
+(計分方式說明, first and second half) and download/2026_Nine grid.jpg (Q W E
+= the three small red-ring holes above the 3x3 = 指定得分格).
+
+**Changed (index.html v4, sw.js tel-scoreboard-4):** `scoreOf(counts, half,
+lit, mult)`: grid 2 per ball capped 3 / 2 per box; the lit box (new 指定得分格
+selector Q / W / E, auto-set by the first bonus ball, undo restores it) 4 per
+ball with the same cap, unlit bonus boxes 0; lines = all 3 boxes with a
+ball, h +2 / v +4 / d +8, each once, second half only (shown in the first
+half, not scored); second half round-1 multiplier x1.1 / x1.2 selector.
+Score panel under the board (total, parts, lines as tags, lined cells
+outlined). Saved halves store lit / mult / score; the log card and the
+CSV (指定格, 九宮格分, 指定格分, 連線條數, 連線, 連線分, 加乘, 總得分) use
+scoreOf, so old records get scores too (lit unknown: any bonus ball counts).
+
+**Open:** the rules allow 3 (first half) / 2 (second half) balls in the lit
+box; the UI still caps a bonus box at 1 ball (Jeremy, 2026-11-16) and the
+robot's full auto shoots 1. Scoring already uses the rule cap.
+
+**Evidence:** local browser: second half 1,5,9 -> 18 (the rules' team B
+example); full grid + lit 1 -> 74, x1.2 -> 88.8; first half 5x3+4+6+E ->
+14, line 4-5-6 shown "not scored"; undo restores the lit box; saved
+card shows the score.

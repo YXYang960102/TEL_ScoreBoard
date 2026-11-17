@@ -10,7 +10,7 @@
 //     short timeout, and the cache only when offline / the venue Wi-Fi has
 //     no internet -- so an online open always shows the newest version.
 // Bump VERSION with every change anyway (the old caches are dropped).
-const VERSION = "tel-scoreboard-3";
+const VERSION = "tel-scoreboard-4";
 const FILES = ["./", "./index.html", "./manifest.webmanifest", "./icon-192.png", "./icon-512.png"];
 const NETWORK_TIMEOUT_MS = 3000;
 

@@ -81,6 +81,21 @@
   .cell .misses { position: absolute; top: 6px; right: 8px; font-size: 13px; font-weight: 700; color: #b00020; }
   .board.missing .cell { box-shadow: inset 0 0 0 3px var(--danger); }
 
+  .score { background: var(--panel); border-radius: var(--radius); padding: 10px 12px; margin-top: 10px; }
+  .score .total { display: flex; align-items: baseline; gap: 10px; }
+  .score .total b { font-size: 34px; color: #fff; }
+  .score .total .mult { margin-left: auto; font-size: 14px; color: var(--muted); }
+  .score .total select { background: var(--panel-2); border: 1px solid var(--line); border-radius: 7px; padding: 3px 6px; }
+  .score .total select option { color: #000; }
+  .score .parts { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 14px; color: var(--muted); margin-top: 4px; }
+  .score .parts b { color: var(--text); }
+  .score .lines { margin-top: 6px; font-size: 14px; }
+  .score .lines .tag { display: inline-block; border-radius: 6px; padding: 2px 7px; margin: 2px 4px 2px 0; background: var(--panel-2); border: 1px solid var(--line); }
+  .score .lines .tag.d { border-color: #ff9f0a; } .score .lines .tag.v { border-color: var(--accent); } .score .lines .tag.h { border-color: #34c759; }
+  .score .note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+  .cell.lit { box-shadow: inset 0 0 0 4px #ff3b30, 0 0 12px #ff3b3088; }
+  .cell.inline { outline: 3px solid #ff9f0a; outline-offset: -3px; }
+  .cell .lit-tag { position: absolute; top: 4px; left: 8px; font-size: 11px; font-weight: 700; color: #b00020; }
   .summary { display: flex; justify-content: space-between; align-items: center; margin: 10px 2px; color: var(--muted); font-size: 15px; }
   .summary b { color: var(--text); font-size: 20px; }
 
@@ -150,7 +165,7 @@
 <body>
 <div class="app">
   <header>
-    <h1>TEL 計分面板 <small id="appVersion" style="font-size:12px;color:var(--muted);font-weight:400">v3</small></h1>
+    <h1>TEL 計分面板 <small id="appVersion" style="font-size:12px;color:var(--muted);font-weight:400">v4</small></h1>
     <div class="tabs">
       <button id="tabScore" class="on">計分</button>
       <button id="tabLog">紀錄</button>
@@ -179,6 +194,18 @@
       </div>
     </div>
 
+    <div class="bar" style="grid-template-columns:1fr">
+      <div class="field">
+        <label>指定得分格（亮燈的加分框，每顆 4 分；其他加分框不計分）</label>
+        <div class="seg" id="litSeg">
+          <button data-lit="">還不知道</button>
+          <button data-lit="Q">Q</button>
+          <button data-lit="W">W</button>
+          <button data-lit="E">E</button>
+        </div>
+      </div>
+    </div>
+
     <div class="legend" id="legend"></div>
 
     <div class="mode">
@@ -187,6 +214,17 @@
     </div>
 
     <div class="board" id="board"></div>
+
+    <div class="score" id="scorePanel">
+      <div class="total"><span>總得分</span><b id="totalScore">0</b>
+        <span class="mult" id="multBox">下半場第一回合加乘
+          <select id="multSelect"><option value="1">無</option><option value="1.1">×1.1（上半場 9–12 名）</option><option value="1.2">×1.2（上半場 5–8 名）</option></select>
+        </span>
+      </div>
+      <div class="parts" id="scoreParts"></div>
+      <div class="lines" id="scoreLines"></div>
+      <div class="note" id="scoreNote"></div>
+    </div>
 
     <div class="summary">
       <span>這半場進球 <b id="totalBalls">0</b></span>
@@ -271,7 +309,7 @@ const DISTANCES = ["2.5", "3", "3.5", "4", "4.5", "5", "5.5", "6", "6.5"];
 // ---------- state ----------
 const blankCounts = () => Object.fromEntries(HOLE_ORDER.map((h) => [h, 0]));
 let state = {
-  current: { match: "", half: 1, ballColor: "黃", counts: blankCounts(), startedAt: Date.now() },
+  current: { match: "", half: 1, ballColor: "黃", counts: blankCounts(), lit: "", mult: 1, startedAt: Date.now() },
   halves: [],   // saved halves
   notes: [],    // misses / voice notes
 };
@@ -287,6 +325,8 @@ function load() {
       if (s && s.current && Array.isArray(s.halves) && Array.isArray(s.notes)) {
         state = s;
         state.current.counts = Object.assign(blankCounts(), state.current.counts || {});
+        if (typeof state.current.lit !== "string") state.current.lit = "";
+        if (!state.current.mult) state.current.mult = 1;
       }
     }
     localStorage.setItem(STORE_KEY + "-probe", "1");
@@ -364,6 +404,36 @@ const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 
 // the first half, 2 in the second.
 const BONUS = new Set(["Q", "W", "E"]);
 const maxBalls = (half, hole) => (BONUS.has(hole) ? 1 : half === 2 ? 2 : 3);
+// Official scoring (TEL 機器人大賽 2026 rules, 2026_rule_1112.pdf):
+// grid 2 per ball, at most 3 (first half) / 2 (second half) balls a box count;
+// the lit 指定得分格 (one of Q W E) 4 per ball, same cap; the other bonus
+// boxes nothing; lines only in the second half: a line = all 3 boxes with a
+// ball, horizontal +2, vertical +4, diagonal +8, each line once (max 34);
+// second half round 1 x1.1 / x1.2 by first-half rank.
+const GRID_PER_BALL = 2, LIT_PER_BALL = 4;
+const ruleCap = (half) => (half === 2 ? 2 : 3);
+const LINES = [
+  { kind: "h", name: "橫", holes: ["3", "6", "9"], pts: 2 },
+  { kind: "h", name: "橫", holes: ["2", "5", "8"], pts: 2 },
+  { kind: "h", name: "橫", holes: ["1", "4", "7"], pts: 2 },
+  { kind: "v", name: "直", holes: ["1", "2", "3"], pts: 4 },
+  { kind: "v", name: "直", holes: ["4", "5", "6"], pts: 4 },
+  { kind: "v", name: "直", holes: ["7", "8", "9"], pts: 4 },
+  { kind: "d", name: "斜", holes: ["1", "5", "9"], pts: 8 },
+  { kind: "d", name: "斜", holes: ["3", "5", "7"], pts: 8 },
+];
+const GRID = ["1", "2", "3", "4", "5", "6", "7", "8", "9"];
+function scoreOf(counts, half, lit, mult) {
+  const cap = ruleCap(half);
+  const grid = GRID.reduce((s, h) => s + Math.min(cap, counts[h] || 0) * GRID_PER_BALL, 0);
+  const litHoles = lit ? [lit] : [...BONUS];
+  const bonus = litHoles.reduce((s, h) => s + Math.min(cap, counts[h] || 0) * LIT_PER_BALL, 0);
+  const lines = LINES.filter((l) => l.holes.every((h) => (counts[h] || 0) > 0));
+  const linePts = half === 2 ? lines.reduce((s, l) => s + l.pts, 0) : 0;
+  const m = half === 2 ? Number(mult) || 1 : 1;
+  const raw = grid + bonus + linePts;
+  return { grid, bonus, lines, linePts, mult: m, raw, total: Math.round(raw * m * 10) / 10 };
+}
 const holeLabel = (h) => (h ? `${h}（${HOLES[h]}）` : "未指定框");
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 let toastTimer;
@@ -384,6 +454,8 @@ function renderTop() {
   const sel = $("colorSelect");
   if (!sel.options.length) COLORS.forEach((c) => sel.add(new Option(c + "球", c)));
   sel.value = state.current.ballColor;
+  document.querySelectorAll("#litSeg button").forEach((b) =>
+    b.classList.toggle("on", b.dataset.lit === (state.current.lit || "")));
   const half = state.current.half;
   $("legend").innerHTML = HALF_COLORS[half].map((c, n) =>
     `<span><i class="dot" style="background:${c}"></i>${COLOR_WORDS[c]} ${n} 顆</span>`).join("") +
@@ -395,17 +467,38 @@ function renderBoard() {
   const colors = HALF_COLORS[half];
   const missCount = {};
   state.notes.filter(isCurrentNote).forEach((n) => { if (n.hole) missCount[n.hole] = (missCount[n.hole] || 0) + 1; });
+  const sc = scoreOf(state.current.counts, half, state.current.lit, state.current.mult);
+  const inLine = new Set(sc.lines.flatMap((l) => l.holes));
   $("board").innerHTML = LAYOUT.map((row, i) =>
     `<div class="row${i === 0 ? " bonus" : ""}">` + row.map((h) => {
       const n = state.current.counts[h] || 0;
       const m = missCount[h] ? `<span class="misses">✕${missCount[h]}</span>` : "";
-      return `<button class="cell" data-hole="${h}" style="background:${colors[Math.min(n, colors.length - 1)]}">` +
-        `${m}<span class="name">${h}</span><span class="count">${n}</span></button>`;
+      const lit = state.current.lit === h;
+      const cls = "cell" + (lit ? " lit" : "") + (inLine.has(h) ? " inline" : "");
+      return `<button class="${cls}" data-hole="${h}" style="background:${colors[Math.min(n, colors.length - 1)]}">` +
+        `${lit ? `<span class="lit-tag">亮燈</span>` : ""}${m}<span class="name">${h}</span><span class="count">${n}</span></button>`;
     }).join("") + `</div>`).join("");
+  renderScore(sc, half);
   $("board").classList.toggle("missing", mode === "miss");
   const total = HOLE_ORDER.reduce((s, h) => s + (state.current.counts[h] || 0), 0);
   $("totalBalls").textContent = total;
   $("totalMisses").textContent = state.notes.filter(isCurrentNote).length;
+}
+function renderScore(sc, half) {
+  $("totalScore").textContent = sc.total;
+  $("multBox").classList.toggle("hidden", half !== 2);
+  $("multSelect").value = String(state.current.mult || 1);
+  const litText = state.current.lit ? `指定格 ${state.current.lit}` : "加分框（還沒選亮哪格）";
+  $("scoreParts").innerHTML =
+    `<span>九宮格 <b>${sc.grid}</b></span><span>${litText} <b>${sc.bonus}</b></span>` +
+    `<span>連線 <b>${sc.linePts}</b>${half === 2 ? "" : "（上半場不計）"}</span>` +
+    (sc.mult !== 1 ? `<span>${sc.raw} × ${sc.mult}</span>` : "");
+  $("scoreLines").innerHTML = sc.lines.length
+    ? `連線 ${sc.lines.length} 條：` + sc.lines.map((l) => `<span class="tag ${l.kind}">${l.name} ${l.holes.join("-")}${half === 2 ? ` +${l.pts}` : ""}</span>`).join("")
+    : `<span style="color:var(--muted)">還沒有連線（同一條線 3 格都有球才算）</span>`;
+  $("scoreNote").textContent = half === 2
+    ? "下半場：每顆 2 分、每格最多算 2 顆；指定格每顆 4 分；橫線 +2、直線 +4、斜線 +8，每條只算一次。"
+    : "上半場：每顆 2 分、每格最多算 3 顆；指定格每顆 4 分。連線只有下半場計分。";
 }
 function isCurrentNote(n) {
   return n.half === state.current.half && n.match === state.current.match && n.at >= state.current.startedAt;
@@ -420,8 +513,9 @@ function changeCount(hole, delta) {
     if (delta > 0) toast(BONUS.has(hole) ? `${hole} 加分框只能進 1 顆` : `${hole} 已經滿了（長按 −1）`);
     return;
   }
-  undoStack.push({ hole, before });
+  undoStack.push({ hole, before, lit: state.current.lit });
   state.current.counts[hole] = after;
+  if (delta > 0 && BONUS.has(hole) && !state.current.lit) { state.current.lit = hole; renderTop(); }
   save();
   renderBoard();
   buzz();
@@ -461,11 +555,18 @@ document.querySelectorAll("#halfSeg button").forEach((b) => b.addEventListener("
   if (total > 0) saveHalf(true);
   state.current.half = half;
   state.current.counts = blankCounts();
+  state.current.lit = "";
+  if (half !== 2) state.current.mult = 1;
   state.current.startedAt = Date.now();
   undoStack = [];
   save(); renderTop(); renderBoard();
 }));
 $("colorSelect").addEventListener("change", () => { state.current.ballColor = $("colorSelect").value; save(); });
+document.querySelectorAll("#litSeg button").forEach((b) => b.addEventListener("click", () => {
+  state.current.lit = b.dataset.lit;
+  save(); renderTop(); renderBoard();
+}));
+$("multSelect").addEventListener("change", () => { state.current.mult = Number($("multSelect").value) || 1; save(); renderBoard(); });
 
 function setMode(m) {
   mode = m;
@@ -480,26 +581,33 @@ $("undoBtn").addEventListener("click", () => {
   const last = undoStack.pop();
   if (!last) { toast("沒有可以復原的"); return; }
   state.current.counts[last.hole] = last.before;
-  save(); renderBoard();
+  if ("lit" in last) state.current.lit = last.lit;
+  save(); renderBoard(); renderTop();
 });
 $("resetBtn").addEventListener("click", () => {
   if (!confirm("清空這半場的計分？（沒進紀錄不會刪）")) return;
   state.current.counts = blankCounts();
+  state.current.lit = "";
   undoStack = [];
-  save(); renderBoard();
+  save(); renderTop(); renderBoard();
 });
 function saveHalf(quiet) {
   const counts = { ...state.current.counts };
   const total = HOLE_ORDER.reduce((s, h) => s + (counts[h] || 0), 0);
+  const lit = state.current.lit || "";
+  const mult = state.current.half === 2 ? state.current.mult || 1 : 1;
+  const sc = scoreOf(counts, state.current.half, lit, mult);
   state.halves.unshift({
     id: uid(), match: state.current.match, half: state.current.half, ballColor: state.current.ballColor,
-    counts, total, startedAt: state.current.startedAt, savedAt: Date.now(),
+    counts, total, lit, mult, score: sc.total, startedAt: state.current.startedAt, savedAt: Date.now(),
   });
   state.current.counts = blankCounts();
+  state.current.lit = "";
   state.current.startedAt = Date.now();
   undoStack = [];
   save();
-  if (!quiet) toast(`已儲存：${state.current.match || "未填場次"} ${HALF_NAMES[state.current.half]}，${total} 顆`);
+  if (!quiet) toast(`已儲存：${state.current.match || "未填場次"} ${HALF_NAMES[state.current.half]}，${total} 顆、${sc.total} 分`);
+  renderTop();
 }
 $("saveBtn").addEventListener("click", () => {
   if (!state.current.match && !confirm("還沒填場次，仍要儲存嗎？")) return;
@@ -640,6 +748,11 @@ function miniGrid(counts, half) {
     return `<div class="${i === 0 ? "b" : ""}" style="background:${colors[Math.min(n, colors.length - 1)]}">${n}</div>`;
   }).join("")).join("") + `</div>`;
 }
+function halfScoreText(r) {
+  const sc = scoreOf(r.counts || {}, r.half, r.lit || "", r.mult || 1);
+  return `<b style="color:var(--text)">${sc.total} 分</b>` +
+    `（九宮格 ${sc.grid}、指定格${r.lit ? " " + esc(r.lit) : ""} ${sc.bonus}、連線 ${sc.linePts}${sc.lines.length ? ` / ${sc.lines.length} 條` : ""}${sc.mult !== 1 ? `、×${sc.mult}` : ""}）`;
+}
 function renderLog() {
   const halves = state.halves;
   $("halfCount").textContent = `${halves.length} 筆`;
@@ -647,7 +760,7 @@ function renderLog() {
     <div class="card" data-id="${r.id}">
       <div class="top"><b>${esc(r.match || "未填場次")}　${HALF_NAMES[r.half]}　${esc(r.ballColor)}球</b>
         <button class="del" data-del-half="${r.id}">刪除</button></div>
-      <div class="meta">${stamp(r.savedAt)}　進球 ${r.total} 顆</div>
+      <div class="meta">${stamp(r.savedAt)}　進球 ${r.total} 顆　${halfScoreText(r)}</div>
       ${miniGrid(r.counts, r.half)}
     </div>`).join("") : `<div class="empty">還沒有儲存的半場。</div>`;
 
@@ -718,12 +831,15 @@ $("exportJson").addEventListener("click", async () => {
 const csvCell = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
 $("exportCsv").addEventListener("click", async () => {
   const lines = [];
-  lines.push(["類型", "時間", "場次", "半場", "球色", ...HOLE_ORDER.map((h) => `框${h}`), "進球合計", "框", "距離(m)", "備註", "錄音(秒)"].join(","));
+  lines.push(["類型", "時間", "場次", "半場", "球色", ...HOLE_ORDER.map((h) => `框${h}`), "進球合計", "指定格", "九宮格分", "指定格分", "連線條數", "連線", "連線分", "加乘", "總得分", "框", "距離(m)", "備註", "錄音(秒)"].join(","));
   for (const r of [...state.halves].reverse()) {
-    lines.push(["計分", stamp(r.savedAt), r.match, HALF_NAMES[r.half], r.ballColor, ...HOLE_ORDER.map((h) => r.counts[h] || 0), r.total, "", "", "", ""].map(csvCell).join(","));
+    const sc = scoreOf(r.counts || {}, r.half, r.lit || "", r.mult || 1);
+    const lineText = sc.lines.map((l) => `${l.name}${l.holes.join("-")}`).join(" ");
+    lines.push(["計分", stamp(r.savedAt), r.match, HALF_NAMES[r.half], r.ballColor, ...HOLE_ORDER.map((h) => r.counts[h] || 0), r.total,
+      r.lit || "", sc.grid, sc.bonus, sc.lines.length, lineText, sc.linePts, sc.mult, sc.total, "", "", "", ""].map(csvCell).join(","));
   }
   for (const n of [...state.notes].reverse()) {
-    lines.push(["沒進", stamp(n.at), n.match, HALF_NAMES[n.half], n.ballColor, ...HOLE_ORDER.map(() => ""), "", n.hole || "", n.distance, n.note, n.clipId ? n.clipSeconds : ""].map(csvCell).join(","));
+    lines.push(["沒進", stamp(n.at), n.match, HALF_NAMES[n.half], n.ballColor, ...HOLE_ORDER.map(() => ""), "", "", "", "", "", "", "", "", "", n.hole || "", n.distance, n.note, n.clipId ? n.clipSeconds : ""].map(csvCell).join(","));
   }
   await deliver(new Blob(["﻿" + lines.join("\r\n") + "\r\n"], { type: "text/csv" }), `tel_scoreboard_${fileStamp()}.csv`);
 });
