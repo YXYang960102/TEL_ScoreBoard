@@ -117,3 +117,36 @@ robot's full auto shoots 1. Scoring already uses the rule cap.
 example); full grid + lit 1 -> 74, x1.2 -> 88.8; first half 5x3+4+6+E ->
 14, line 4-5-6 shown "not scored"; undo restores the lit box; saved
 card shows the score.
+
+## 2026-11-19 — v5: 偵察 (scouting) tab with the field drawing
+
+**User Request (Jeremy):** besides 計分 and 紀錄, a scouting tab: team name,
+the same scoring clicks, and a drawing area with the field map to draw other
+teams' auto paths. Field = the rules' picture (not a redraw), whole field.
+
+**Added (index.html v5, sw.js tel-scoreboard-5):**
+- Tab 偵察 between 計分 and 紀錄: 隊伍 (datalist of saved team names), 場次,
+  半場, 指定得分格, the same board + score panel (own state
+  `state.scout.current`, own undo), 戰術備註, 復原計分 / 清空 / 儲存這筆偵察.
+- Field drawing: field A cropped from 2026_rule.pdf 圖(一) (embedded JPEG,
+  324x722, ~47 KB; 九宮格得分區 + 機器人作業區 with both start boxes) on a
+  canvas sized to fit 75 % of the screen height (room at the sides to
+  scroll; the canvas itself is touch-action: none). Pointer strokes stored
+  as 0..1 coordinates ({c, p: [x0, y0, ...]}, 4 decimals); start dot +
+  arrow head at the end; a tap = a marker dot. Pens red / blue / black,
+  復原一筆, 清除路徑.
+- 紀錄: 偵察紀錄 section (team filter, mini grid, score text, path
+  thumbnail, note, 存成圖片 = PNG 648x1540 with a header line, 刪除).
+- JSON export adds `scouts` / `teams`; import merges them by id; CSV adds
+  偵察 rows and two last columns 隊伍, 路徑筆數; 刪除全部 also clears scouts.
+
+**Changed:** the board / score panel code is shared (cellsHtml, renderScore
+with an id map, bindBoard); 計分 behaves as before. The voice button is
+hidden on the 偵察 tab. Old (v4) saved data loads (scout state created).
+
+**Evidence:** local browser (http.server, 375x812 and narrow pane): main
+tab 5 x2 -> 4; scout second half 1, 5 x2, 9 + W -> 20 (diagonal +8);
+synthetic pen strokes and a real mouse drag land at the right 0..1
+coordinates; save -> record + team list + log card + thumbnail; PNG
+(622 KB), JSON and CSV exports; JSON import of a scout record; v4-shaped
+storage loads with no errors; no horizontal overflow at 375 px.
